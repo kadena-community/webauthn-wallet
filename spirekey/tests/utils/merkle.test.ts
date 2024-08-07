@@ -142,12 +142,11 @@ describe('Merkle', () => {
           { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'F', direction: 1 },
           { hash: 'H(G,H)', direction: 1 },
-          { hash: 'H(H(I,J),H(K,l))', direction: 1 },
-          { hash: 'H(H(M,N),H(O,P))', direction: 1 },
+          { hash: 'H(H(H(I,J),H(K,l)),H(H(M,N),H(O,P)))', direction: 1 },
           { hash: 'Q', direction: 1 },
         ]);
       });
-      it.only('should get the 5 leaves', () => {
+      it('should get the 5 leaves', () => {
         // H(H(H(H(A,B),H(C,D)),H(H(E,F),H(G,H))),H(H(H(I,J),H(K,l)),H(H(M,N),H(O,P))))    Q
         // H(H(H(A,B),H(C,D)),H(H(E,F),H(G,H)))    H(H(H(I,J),H(K,l)),H(H(M,N),H(O,P)))    Q
         // H(H(A,B),H(C,D))   H(H(E,F),H(G,H))       H(H(I,J),H(K,l))  H(H(M,N),H(O,P))    Q

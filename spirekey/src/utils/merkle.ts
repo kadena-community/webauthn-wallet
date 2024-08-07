@@ -51,12 +51,6 @@ const isMinimalLeft = (index: number) => (currentSize: number) => {
   if (levelsBefore === Math.log2(index)) return currentSize <= 1;
   return currentSize <= currLevel;
 };
-const isMinimalRight =
-  (index: number, treeSize: number) => (currentSize: number) => {
-    console.warn('DEBUGPRINT[36]: merkle.ts:55: index=', index);
-    console.warn('DEBUGPRINT[35]: merkle.ts:55: treeSize=', treeSize);
-    return currentSize <= Math.log2(treeSize - index);
-  };
 const getLeftLeaves =
   (hash: HashFunction) =>
   (
@@ -70,35 +64,35 @@ const getLeftLeaves =
     return getLeftLeaves(hash)(isMinSize, left);
   };
 
+const mergeLeaves =
+  (hash: HashFunction) =>
+  (proofLeaves: ProofLeaf[]): ProofLeaf => {
+    const leaves = constructLeaves(proofLeaves).flatMap(mapProofLeaf(hash));
+    if (leaves.length > 1) return mergeLeaves(hash)(leaves);
+    return leaves[0];
+  };
+
+const getLeaves = (level: number, depth: number) => {
+  if (depth === 0 || level < depth) return Math.ceil(Math.pow(2, level) / 2);
+  return Math.ceil(Math.pow(2, level));
+};
+
 const getRightLeaves =
   (hash: HashFunction) =>
   (index: number, treeSize: number, proofLeaves: ProofLeaf[]): ProofLeaf[] => {
-    const right = proofLeaves.filter(
-      (p: ProofLeaf) => p.direction === DIRECTION.RIGHT,
-    );
-    const amountOfNeededSiblings = Math.ceil(Math.log2(treeSize - index));
-    console.warn(
-      'DEBUGPRINT[38]: merkle.ts:79: amountOfNeededSiblings=',
-      amountOfNeededSiblings,
-    );
-
+    const right = proofLeaves.filter((l) => l.direction === DIRECTION.RIGHT);
+    const max = Math.ceil(Math.log2(treeSize));
+    const used = index === 0 ? 0 : Math.ceil(Math.log2(index));
+    const amountOfNeededSiblings = max - used;
     let leavesCounted = 0;
     const proof = [];
-    for (let sibling = 0; sibling < amountOfNeededSiblings; sibling++) {
-      const leaves = Math.ceil(Math.pow(2, sibling) / 2);
-      const siblings = proofLeaves.slice(leavesCounted, leavesCounted + leaves);
-      // recursively map through till 1 hash is left
-      const sl = constructLeaves(siblings).flatMap(mapProofLeaf(hash));
-      proof.push(sl);
+    for (let sibling = 0; sibling <= amountOfNeededSiblings; sibling++) {
+      const leaves = getLeaves(sibling, used);
+      const siblings = right.slice(leavesCounted, leavesCounted + leaves);
+      proof.push(mergeLeaves(hash)(siblings));
       leavesCounted = leavesCounted + leaves;
     }
-
-    // const right = constructLeaves(
-    //   proofLeaves.filter((p: ProofLeaf) => p.direction === DIRECTION.RIGHT),
-    // ).flatMap(mapProofLeaf(hash));
-    // if (isMinSize(right.length)) return right;
-    // return getRightLeaves(hash)(isMinSize, right);
-    return proof.flatMap((x) => x);
+    return proof.filter(Boolean);
   };
 const mapProofLeaf =
   (hash: HashFunction) =>
