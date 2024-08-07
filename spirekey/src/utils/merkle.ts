@@ -45,16 +45,79 @@ type MerkleProofAccumulator = {
   currentDirection: DIRECTION;
   proofLeaves: ProofLeaf[];
 };
+const isMinimalLeft = (index: number) => (currentSize: number) => {
+  const currLevel = Math.ceil(Math.log2(index));
+  const levelsBefore = Math.floor(Math.log2(index));
+  if (levelsBefore === Math.log2(index)) return currentSize <= 1;
+  return currentSize <= currLevel;
+};
+const isMinimalRight =
+  (index: number, treeSize: number) => (currentSize: number) => {
+    console.warn('DEBUGPRINT[36]: merkle.ts:55: index=', index);
+    console.warn('DEBUGPRINT[35]: merkle.ts:55: treeSize=', treeSize);
+    return currentSize <= Math.log2(treeSize - index);
+  };
+const getLeftLeaves =
+  (hash: HashFunction) =>
+  (
+    isMinSize: (currentSize: number) => boolean,
+    proofLeaves: ProofLeaf[],
+  ): ProofLeaf[] => {
+    const left = constructLeaves(
+      proofLeaves.filter((p: ProofLeaf) => p.direction === DIRECTION.LEFT),
+    ).flatMap(mapProofLeaf(hash));
+    if (isMinSize(left.length)) return left;
+    return getLeftLeaves(hash)(isMinSize, left);
+  };
+
+const getRightLeaves =
+  (hash: HashFunction) =>
+  (index: number, treeSize: number, proofLeaves: ProofLeaf[]): ProofLeaf[] => {
+    const right = proofLeaves.filter(
+      (p: ProofLeaf) => p.direction === DIRECTION.RIGHT,
+    );
+    const amountOfNeededSiblings = Math.ceil(Math.log2(treeSize - index));
+    console.warn(
+      'DEBUGPRINT[38]: merkle.ts:79: amountOfNeededSiblings=',
+      amountOfNeededSiblings,
+    );
+
+    let leavesCounted = 0;
+    const proof = [];
+    for (let sibling = 0; sibling < amountOfNeededSiblings; sibling++) {
+      const leaves = Math.ceil(Math.pow(2, sibling) / 2);
+      const siblings = proofLeaves.slice(leavesCounted, leavesCounted + leaves);
+      // recursively map through till 1 hash is left
+      const sl = constructLeaves(siblings).flatMap(mapProofLeaf(hash));
+      proof.push(sl);
+      leavesCounted = leavesCounted + leaves;
+    }
+
+    // const right = constructLeaves(
+    //   proofLeaves.filter((p: ProofLeaf) => p.direction === DIRECTION.RIGHT),
+    // ).flatMap(mapProofLeaf(hash));
+    // if (isMinSize(right.length)) return right;
+    // return getRightLeaves(hash)(isMinSize, right);
+    return proof.flatMap((x) => x);
+  };
+const mapProofLeaf =
+  (hash: HashFunction) =>
+  ([a, b]: any) => {
+    if (a?.isDirectSibling || b?.isDirectSibling) return [a, b].filter(Boolean);
+    if (!a) return b;
+    if (!b) return a;
+    return {
+      hash: hash(`${a.hash},${b.hash}`),
+      direction: a.direction,
+      isDirectSibling: false,
+    };
+  };
 const buildProof =
-  (hash: HashFunction) => (hashes: string[], proofLeaves: ProofLeaf[]) => {
-    // Math.floor(Math.log2(hashes.length));
-    return constructLeaves(proofLeaves).flatMap(([a, b]) => {
-      if (a?.isDirectSibling || b?.isDirectSibling)
-        return [a, b].filter(Boolean);
-      if (!a) return b;
-      if (!b) return a;
-      return { hash: hash(`${a.hash},${b.hash}`), direction: a.direction };
-    });
+  (hash: HashFunction) =>
+  (index: number, treeSize: number, proofLeaves: ProofLeaf[]) => {
+    const left = getLeftLeaves(hash)(isMinimalLeft(index), proofLeaves);
+    const right = getRightLeaves(hash)(index, treeSize, proofLeaves);
+    return [...left, ...right];
   };
 export const getMerkleProofWith =
   (hash: HashFunction) =>
@@ -78,7 +141,8 @@ export const getMerkleProofWith =
     );
 
     return buildProof(hash)(
-      hashes,
+      hashes.indexOf(targetHash),
+      hashes.length,
       proofLeaves.filter((l) => !!l.hash),
-    ).map(({ direction, hash }) => ({ direction, hash }));
+    ).map(({ direction, hash }: ProofLeaf) => ({ direction, hash }));
   };
