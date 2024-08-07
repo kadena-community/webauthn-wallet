@@ -47,12 +47,7 @@ type MerkleProofAccumulator = {
 };
 const buildProof =
   (hash: HashFunction) => (hashes: string[], proofLeaves: ProofLeaf[]) => {
-    Math.floor(Math.log2(hashes.length));
-    console.warn(
-      'DEBUGPRINT[4]: merkle.ts:50: Math.floor(Math.log2(hashes.length))=',
-      hashes.length,
-      Math.floor(Math.log2(hashes.length)),
-    );
+    // Math.floor(Math.log2(hashes.length));
     return constructLeaves(proofLeaves).flatMap(([a, b]) => {
       if (a?.isDirectSibling || b?.isDirectSibling)
         return [a, b].filter(Boolean);
@@ -81,6 +76,7 @@ export const getMerkleProofWith =
         proofLeaves: [],
       },
     );
+
     return buildProof(hash)(
       hashes,
       proofLeaves.filter((l) => !!l.hash),

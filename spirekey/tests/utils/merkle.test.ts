@@ -66,7 +66,7 @@ describe('Merkle', () => {
     });
     describe('And we have 5 entries', () => {
       describe('And we want to have the proof for A', () => {
-        it('should get [B, H(C,D), H(H(E,0),H(0,0))]', () => {
+        it('should get [B, H(C,D), E]', () => {
           const hashes = ['A', 'B', 'C', 'D', 'E'];
           expect(getMerkleProof('A', hashes)).toEqual([
             { hash: 'B', direction: 1 },
@@ -82,6 +82,35 @@ describe('Merkle', () => {
             { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           ]);
         });
+      });
+    });
+    describe('And we have 6 entries', () => {
+      it('should get [H(H(A,B),H(C,D)), 0, H(0,0)]', () => {
+        const hashes = ['A', 'B', 'C', 'D', 'E', 'F'];
+        expect(getMerkleProof('E', hashes)).toEqual([
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
+          { hash: 'F', direction: 1 },
+        ]);
+      });
+    });
+    describe('And we have 9 entries', () => {
+      it('should get the 3 leaves', () => {
+        const hashes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+        expect(getMerkleProof('E', hashes)).toEqual([
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
+          { hash: 'F', direction: 1 },
+          { hash: 'H(G,H)', direction: 1 },
+          { hash: 'I', direction: 1 },
+        ]);
+      });
+      it('should get the 3 leaves', () => {
+        const hashes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+        expect(getMerkleProof('G', hashes)).toEqual([
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
+          { hash: 'H(E,F)', direction: 0 },
+          { hash: 'H', direction: 1 },
+          { hash: 'I', direction: 1 },
+        ]);
       });
     });
   });
