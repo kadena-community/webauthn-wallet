@@ -49,8 +49,8 @@ describe('Merkle', () => {
         it('should get [H(A,B), D]', () => {
           const hashes = ['A', 'B', 'C', 'D'];
           expect(getMerkleProof('C', hashes)).toEqual([
-            { hash: 'H(A,B)', direction: 0 },
             { hash: 'D', direction: 1 },
+            { hash: 'H(A,B)', direction: 0 },
           ]);
         });
       });
@@ -58,8 +58,8 @@ describe('Merkle', () => {
         it('should get [H(A,B), C]', () => {
           const hashes = ['A', 'B', 'C', 'D'];
           expect(getMerkleProof('D', hashes)).toEqual([
-            { hash: 'H(A,B)', direction: 0 },
             { hash: 'C', direction: 0 },
+            { hash: 'H(A,B)', direction: 0 },
           ]);
         });
       });
@@ -88,8 +88,8 @@ describe('Merkle', () => {
       it('should get [H(H(A,B),H(C,D)), 0, H(0,0)]', () => {
         const hashes = ['A', 'B', 'C', 'D', 'E', 'F'];
         expect(getMerkleProof('E', hashes)).toEqual([
-          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'F', direction: 1 },
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
         ]);
       });
     });
@@ -97,21 +97,21 @@ describe('Merkle', () => {
       it('should get the 4 leaves', () => {
         const hashes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
         expect(getMerkleProof('E', hashes)).toEqual([
-          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'F', direction: 1 },
           { hash: 'H(G,H)', direction: 1 },
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'I', direction: 1 },
         ]);
       });
       it('should get the 3 leaves', () => {
-        // [      'ABCD',         'EF',     'H',  'I'];
+        // [      'ABCD',             'EFGH',  'I'];
         // [  'AB',     'CD',     'EF',     'GH', 'I'];
         // ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
         const hashes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
         expect(getMerkleProof('G', hashes)).toEqual([
-          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
-          { hash: 'H(E,F)', direction: 0 },
           { hash: 'H', direction: 1 },
+          { hash: 'H(E,F)', direction: 0 },
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'I', direction: 1 },
         ]);
       });
@@ -139,9 +139,9 @@ describe('Merkle', () => {
       it('should get the 6 leaves', () => {
         expect(hashes.length).toEqual(17);
         expect(getMerkleProof('E', hashes)).toEqual([
-          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'F', direction: 1 },
           { hash: 'H(G,H)', direction: 1 },
+          { hash: 'H(H(A,B),H(C,D))', direction: 0 },
           { hash: 'H(H(H(I,J),H(K,l)),H(H(M,N),H(O,P)))', direction: 1 },
           { hash: 'Q', direction: 1 },
         ]);

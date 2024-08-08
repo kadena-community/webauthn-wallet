@@ -25,118 +25,87 @@ enum DIRECTION {
   LEFT = 0,
   RIGHT = 1,
 }
-type ProofLeaf = {
-  hash: string;
-  direction: DIRECTION;
-  isDirectSibling: boolean;
+const getStartingLeaf = (subjectIndex: number, leaves: Leaf[][]) => {
+  const leafIndex = Math.floor(subjectIndex / 2);
+  const subjectSiblingIndex = (subjectIndex + 1) % 2;
+  const siblingHash = leaves[leafIndex][subjectSiblingIndex];
+  return {
+    hash: siblingHash,
+    direction: subjectSiblingIndex,
+  };
 };
-const createProofLeafWith =
+const mergeProof =
   (hash: HashFunction) =>
-  (subject: string, [a, b]: Leaf, direction: DIRECTION) => {
-    if (a === subject)
-      return { hash: b, direction: DIRECTION.RIGHT, isDirectSibling: true };
-    if (b === subject)
-      return { hash: a, direction: DIRECTION.LEFT, isDirectSibling: true };
-    if (!a) return { hash: b, direction, isDirectSibling: false };
-    if (!b) return { hash: a, direction, isDirectSibling: false };
-    return { hash: hash(`${a},${b}`), direction, isDirectSibling: false };
+  (leaves: Leaf[]): string => {
+    const proof: Leaf = leaves
+      .flatMap(([a, b]) => {
+        if (!a) return b;
+        if (!b) return a;
+        return hash(`${a},${b}`);
+      })
+      .filter(Boolean);
+    if (proof.length > 1) return mergeProof(hash)(constructLeaves(proof));
+    return proof[0];
   };
-type MerkleProofAccumulator = {
-  currentDirection: DIRECTION;
-  proofLeaves: ProofLeaf[];
+const getLeafDirection = (
+  subjectIndex: number,
+  initialConsideredLeafSize: number,
+  currentLeafSize: number,
+) => {
+  if (currentLeafSize == initialConsideredLeafSize) return DIRECTION.LEFT;
+  if (currentLeafSize / 2 > subjectIndex - initialConsideredLeafSize / 2)
+    return DIRECTION.RIGHT;
+  return DIRECTION.LEFT;
 };
-const isMinimalLeft = (index: number) => (currentSize: number) => {
-  const currLevel = Math.ceil(Math.log2(index));
-  const levelsBefore = Math.floor(Math.log2(index));
-  if (levelsBefore === Math.log2(index)) return currentSize <= 1;
-  return currentSize <= currLevel;
+const getProofIndex = (
+  subjectIndex: number,
+  depth: number,
+  direction: DIRECTION,
+) => {
+  const necesaryLeaves = Math.ceil(Math.pow(2, depth + 1) / 2);
+  if (
+    direction === DIRECTION.LEFT &&
+    necesaryLeaves >= Math.ceil(subjectIndex / 2)
+  )
+    return 0;
+  if (direction === DIRECTION.LEFT)
+    return Math.max(0, Math.ceil(subjectIndex / 2) - necesaryLeaves / 2);
+  if (necesaryLeaves > subjectIndex) return necesaryLeaves / 2;
+  return Math.ceil(subjectIndex / 2) + necesaryLeaves / 2;
 };
-const getLeftLeaves =
-  (hash: HashFunction) =>
-  (
-    isMinSize: (currentSize: number) => boolean,
-    proofLeaves: ProofLeaf[],
-  ): ProofLeaf[] => {
-    const left = constructLeaves(
-      proofLeaves.filter((p: ProofLeaf) => p.direction === DIRECTION.LEFT),
-    ).flatMap(mapProofLeaf(hash));
-    if (isMinSize(left.length)) return left;
-    return getLeftLeaves(hash)(isMinSize, left);
-  };
-
-const mergeLeaves =
-  (hash: HashFunction) =>
-  (proofLeaves: ProofLeaf[]): ProofLeaf => {
-    const leaves = constructLeaves(proofLeaves).flatMap(mapProofLeaf(hash));
-    if (leaves.length > 1) return mergeLeaves(hash)(leaves);
-    return leaves[0];
-  };
-
-const getLeaves = (level: number, depth: number) => {
-  if (depth === 0 || level < depth) return Math.ceil(Math.pow(2, level) / 2);
-  return Math.ceil(Math.pow(2, level));
-};
-
-const getRightLeaves =
-  (hash: HashFunction) =>
-  (index: number, treeSize: number, proofLeaves: ProofLeaf[]): ProofLeaf[] => {
-    const right = proofLeaves.filter((l) => l.direction === DIRECTION.RIGHT);
-    const max = Math.ceil(Math.log2(treeSize));
-    const used = index === 0 ? 0 : Math.ceil(Math.log2(index));
-    const amountOfNeededSiblings = max - used;
-    let leavesCounted = 0;
-    const proof = [];
-    for (let sibling = 0; sibling <= amountOfNeededSiblings; sibling++) {
-      const leaves = getLeaves(sibling, used);
-      const siblings = right.slice(leavesCounted, leavesCounted + leaves);
-      proof.push(mergeLeaves(hash)(siblings));
-      leavesCounted = leavesCounted + leaves;
-    }
-    return proof.filter(Boolean);
-  };
-const mapProofLeaf =
-  (hash: HashFunction) =>
-  ([a, b]: any) => {
-    if (a?.isDirectSibling || b?.isDirectSibling) return [a, b].filter(Boolean);
-    if (!a) return b;
-    if (!b) return a;
-    return {
-      hash: hash(`${a.hash},${b.hash}`),
-      direction: a.direction,
-      isDirectSibling: false,
-    };
-  };
-const buildProof =
-  (hash: HashFunction) =>
-  (index: number, treeSize: number, proofLeaves: ProofLeaf[]) => {
-    const left = getLeftLeaves(hash)(isMinimalLeft(index), proofLeaves);
-    const right = getRightLeaves(hash)(index, treeSize, proofLeaves);
-    return [...left, ...right];
-  };
 export const getMerkleProofWith =
   (hash: HashFunction) =>
-  (targetHash: string, hashes: any[]): any => {
+  (subject: string, hashes: any[]): any => {
     const leaves = constructLeaves(hashes);
-    const creatProofLeaf = createProofLeafWith(hash);
-    const { proofLeaves }: MerkleProofAccumulator = leaves.reduce(
-      ({ currentDirection, proofLeaves }: MerkleProofAccumulator, leaf) => {
-        const newProofLeaf = creatProofLeaf(targetHash, leaf, currentDirection);
-        return {
-          proofLeaves: [...proofLeaves, newProofLeaf],
-          currentDirection: newProofLeaf.isDirectSibling
-            ? DIRECTION.RIGHT
-            : newProofLeaf.direction,
-        };
-      },
-      {
-        currentDirection: DIRECTION.LEFT,
-        proofLeaves: [],
-      },
-    );
+    const subjectIndex = hashes.indexOf(subject);
+    if (subjectIndex < 0) throw new Error('Subject not found');
 
-    return buildProof(hash)(
-      hashes.indexOf(targetHash),
-      hashes.length,
-      proofLeaves.filter((l) => !!l.hash),
-    ).map(({ direction, hash }: ProofLeaf) => ({ direction, hash }));
+    const maxProofLength = Math.ceil(Math.log2(hashes.length));
+    const initialConsideredLeaves = Math.pow(
+      2,
+      Math.ceil(Math.log2(subjectIndex + 1)),
+    );
+    const proof = Array(maxProofLength).fill(0);
+    return proof
+      .map((_, i) => {
+        if (i === 0) return getStartingLeaf(subjectIndex, leaves);
+        const currentLeafSize = Math.pow(2, i + 1);
+        const leafDirection = getLeafDirection(
+          subjectIndex,
+          initialConsideredLeaves,
+          currentLeafSize,
+        );
+        const currentProofLeaves = currentLeafSize / 2 / 2;
+        const lastProvenIndex = getProofIndex(subjectIndex, i, leafDirection);
+
+        const proofHashes = leaves.slice(
+          lastProvenIndex,
+          lastProvenIndex + currentProofLeaves,
+        );
+        return {
+          hash: mergeProof(hash)(proofHashes),
+          direction: leafDirection,
+        };
+      })
+      .filter((x) => x.hash);
   };
